@@ -1,3 +1,4 @@
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -97,8 +98,9 @@ fun SignUpScreen(
                             db.collection("users").document(uid)
                                 .set(profile)
                                 .addOnSuccessListener { navToSignIn() }
-                                .addOnFailureListener { e ->
-                                    Toast.makeText(ctx, e.localizedMessage, Toast.LENGTH_LONG).show()
+                                .addOnFailureListener { ex ->
+                                    Log.e("SignUp", "createUser failed", ex)
+                                    Toast.makeText(ctx, ex.localizedMessage ?: "Unknown error", Toast.LENGTH_LONG).show()
                                 }
                         }
                         .addOnFailureListener { ex ->

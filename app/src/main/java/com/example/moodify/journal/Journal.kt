@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
@@ -24,6 +25,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import kotlinx.coroutines.launch
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -34,16 +36,45 @@ import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Path
 
-// 1. Data classes and Retrofit setup
 @Serializable
 data class HfRequest(val inputs: String)
 
 @Serializable
 data class EmotionLabel(val label: String, val score: Double)
 
-// Response wrapper for BlenderBot model
+// ——— Groq/OpenAI‐style chat types ———
+
 @Serializable
-data class ChatResponse(val generated_text: String)
+data class ChatCompletionMessage(
+    val role: String,
+    val content: String
+)
+
+@Serializable
+data class ChatCompletionRequest(
+    val model: String,
+    val messages: List<ChatCompletionMessage>,
+    val temperature: Double = 0.7
+)
+
+@Serializable
+data class ChatCompletionChoice(
+    val index: Int,
+    val message: ChatCompletionMessage
+)
+
+@Serializable
+data class ChatCompletionResponse(
+    val id: String,
+
+    @SerialName("object")
+    val objectType: String,    // now reads from the JSON field "object"
+
+    val created: Long,
+    val choices: List<ChatCompletionChoice>
+)
+
+// ——— Retrofit interfaces ———
 
 interface HuggingFaceApi {
     @POST("models/{modelId}")
@@ -52,13 +83,6 @@ interface HuggingFaceApi {
         @Path("modelId") modelId: String,
         @Body body: HfRequest
     ): List<List<EmotionLabel>>
-
-    @POST("models/{modelId}")
-    suspend fun chatBlender(
-        @Header("Authorization") auth: String,
-        @Path("modelId") modelId: String,
-        @Body body: HfRequest
-    ): List<ChatResponse>
 }
 
 object HfService {
@@ -72,7 +96,27 @@ object HfService {
     val api: HuggingFaceApi = retrofit.create(HuggingFaceApi::class.java)
 }
 
-// Retry helper for 503s
+interface GroqApi {
+    @POST("chat/completions")
+    suspend fun chatCompletions(
+        @Header("Authorization") auth: String,
+        @Body request: ChatCompletionRequest
+    ): ChatCompletionResponse
+}
+
+object GroqService {
+    private val json = Json { ignoreUnknownKeys = true }
+    @OptIn(ExperimentalSerializationApi::class)
+    private val retrofit = Retrofit.Builder()
+        .baseUrl("https://api.groq.com/openai/v1/")
+        .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+        .build()
+
+    val api: GroqApi = retrofit.create(GroqApi::class.java)
+}
+
+// ——— Retry helper ———
+
 suspend fun <T> retryOn503(
     times: Int = 3,
     initialDelayMs: Long = 1000,
@@ -107,12 +151,12 @@ class EmotionViewModel : ViewModel() {
     var isLoading by mutableStateOf(false)
         private set
 
-    private val authHeader = "Bearer ${BuildConfig.HF_API_TOKEN}"
-    private val emotionModelId  = "j-hartmann/emotion-english-distilroberta-base"
-    private val blenderModelId = "facebook/blenderbot-400M-distill"
+    private val authHeader     = "Bearer ${BuildConfig.HF_API_TOKEN}"
+    private val emotionModelId = "j-hartmann/emotion-english-distilroberta-base"
+    private val groqAuthHeader = "Bearer ${BuildConfig.GROQ_API_KEY}"
+    private val groqModelId    = "llama3-8b-8192"
 
-    // Firestore refs
-    private val db = FirebaseFirestore.getInstance()
+    private val db      = FirebaseFirestore.getInstance()
     private val userUid get() = FirebaseAuth.getInstance().currentUser?.uid
 
     fun onInputChange(text: String) {
@@ -128,20 +172,30 @@ class EmotionViewModel : ViewModel() {
             try {
                 // 1) Emotion classification
                 val nested = retryOn503 {
-                    Log.d(TAG, authHeader)
                     HfService.api.analyzeEmotion(authHeader, emotionModelId, HfRequest(inputText))
                 }
                 results = nested.flatten()
-                Log.d(TAG, "Emotion results= $results")
 
-                // 2) BlenderBot response
-                val resp = retryOn503 {
-                    HfService.api.chatBlender(authHeader, blenderModelId, HfRequest(inputText))
+                // 2) Therapist‐style reply via Groq
+                val systemPrompt = "You are a compassionate therapist. " +
+                        "I will write my journal entry and you will respond with analysis and advice."
+                val messages = listOf(
+                    ChatCompletionMessage("system", systemPrompt),
+                    ChatCompletionMessage("user", inputText)
+                )
+                val groqResp = retryOn503 {
+                    GroqService.api.chatCompletions(
+                        groqAuthHeader,
+                        ChatCompletionRequest(
+                            model       = groqModelId,
+                            messages    = messages,
+                            temperature = 0.7
+                        )
+                    )
                 }
-                blenderReply = resp.firstOrNull()?.generated_text
-                Log.d(TAG, "BlenderBot reply= ${'$'}blenderReply")
+                blenderReply = groqResp.choices.firstOrNull()?.message?.content
 
-                // 3) Save journal entry
+                // 3) Persist to Firestore
                 val entryData = hashMapOf(
                     "text"          to inputText,
                     "createdAt"     to Timestamp.now(),
@@ -167,7 +221,7 @@ class EmotionViewModel : ViewModel() {
 }
 
 @Composable
-fun EmotionScreen(vm: EmotionViewModel = androidx.lifecycle.viewmodel.compose.viewModel()) {
+fun EmotionScreen(vm: EmotionViewModel = viewModel()) {
     val scrollState = rememberScrollState()
     Column(
         modifier = Modifier
@@ -190,21 +244,18 @@ fun EmotionScreen(vm: EmotionViewModel = androidx.lifecycle.viewmodel.compose.vi
             enabled = !vm.isLoading,
             modifier = Modifier.align(Alignment.End)
         ) {
-            if (vm.isLoading)
-                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            if (vm.isLoading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
             else Text("Analyze & Save")
         }
         Spacer(Modifier.height(16.dp))
 
         if (vm.results.isNotEmpty()) {
-            Text(
-                "Emotion Results:",
-                style = MaterialTheme.typography.titleMedium
-            )
-            vm.results.forEach { labelScore ->
-                Text("${labelScore.label}: ${(labelScore.score * 100).toInt()}%")
+            Text("Emotion Results:", style = MaterialTheme.typography.titleMedium)
+            vm.results.forEach { (label, score) ->
+                Text("$label: ${(score * 100).toInt()}%")
             }
         }
+
         vm.blenderReply?.let { reply ->
             Spacer(Modifier.height(12.dp))
             Text("Reflection by AI:", style = MaterialTheme.typography.titleMedium)
@@ -216,3 +267,4 @@ fun EmotionScreen(vm: EmotionViewModel = androidx.lifecycle.viewmodel.compose.vi
 fun NavGraphBuilder.journalGraph(nav: NavHostController) {
     composable("journal") { EmotionScreen() }
 }
+
