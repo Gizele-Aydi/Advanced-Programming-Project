@@ -1,6 +1,7 @@
 // Journal.kt – using Emotion + BlenderBot 3B
 package com.example.moodify.journal
 
+import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
@@ -17,8 +18,11 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.example.moodify.BuildConfig
+import com.example.moodify.tasks.TasksScreen
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -177,8 +181,8 @@ class EmotionViewModel : ViewModel() {
                 results = nested.flatten()
 
                 // 2) Therapist‐style reply via Groq
-                val systemPrompt = "You are a compassionate therapist. " +
-                        "I will write my journal entry and you will respond with analysis and advice."
+                val systemPrompt = "You’re a caring therapist. Respond briefly with insight and advice on this journal entry."
+
                 val messages = listOf(
                     ChatCompletionMessage("system", systemPrompt),
                     ChatCompletionMessage("user", inputText)
@@ -221,7 +225,10 @@ class EmotionViewModel : ViewModel() {
 }
 
 @Composable
-fun EmotionScreen(vm: EmotionViewModel = viewModel()) {
+fun EmotionScreen(
+    vm: EmotionViewModel = viewModel(),
+    navController: NavHostController
+) {
     val scrollState = rememberScrollState()
     Column(
         modifier = Modifier
@@ -260,11 +267,35 @@ fun EmotionScreen(vm: EmotionViewModel = viewModel()) {
             Spacer(Modifier.height(12.dp))
             Text("Reflection by AI:", style = MaterialTheme.typography.titleMedium)
             Text(reply, style = MaterialTheme.typography.bodyLarge)
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = {
+                    val encoded = Uri.encode(reply)
+                    navController.navigate("tasks?summary=$encoded")
+                }
+            ) {
+                Text("Generate Tasks")
+            }
         }
     }
 }
 
-fun NavGraphBuilder.journalGraph(nav: NavHostController) {
-    composable("journal") { EmotionScreen() }
-}
 
+fun NavGraphBuilder.journalGraph(navController: NavHostController) {
+    composable("journal") {
+        EmotionScreen(vm = viewModel(), navController = navController)
+    }
+    composable(
+        route = "tasks?summary={summary}",
+        arguments = listOf(navArgument("summary") {
+            type = NavType.StringType
+            defaultValue = ""
+        })
+    ){ backStackEntry ->
+        val summary = backStackEntry.arguments?.getString("summary").orEmpty()
+        com.example.moodify.tasks.TasksScreen(
+            summary = summary,
+            onBack = { navController.popBackStack() }
+        )
+    }
+}
