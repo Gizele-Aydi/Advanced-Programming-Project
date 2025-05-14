@@ -7,6 +7,7 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -65,49 +66,73 @@ fun HomeScreen(onNavigateToJournal: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MoodifyApp() {
-    val auth = FirebaseAuth.getInstance()
+    val firebaseAuth = remember { FirebaseAuth.getInstance() }
+
+    // 1) Track currentUser in a Compose state
+    var currentUser by remember { mutableStateOf(firebaseAuth.currentUser) }
+    DisposableEffect(firebaseAuth) {
+        val listener = FirebaseAuth.AuthStateListener { auth ->
+            currentUser = auth.currentUser
+        }
+        firebaseAuth.addAuthStateListener(listener)
+        onDispose { firebaseAuth.removeAuthStateListener(listener) }
+    }
+
     val navController = rememberNavController()
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
+    val scope         = rememberCoroutineScope()
+    val drawerState   = rememberDrawerState(DrawerValue.Closed)
 
-    val startDest = if (auth.currentUser == null) "signup" else "journal"
+    // 2) Build a single NavHost with all routes
+    @Composable
+    fun Host() {
+        NavHost(
+            navController    = navController,
+            startDestination = if (currentUser != null) "journal" else "signup"
+        ) {
+            authGraph(navController)
+            journalGraph(navController)
+            appGraph(navController)
+        }
+    }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            ModalDrawerSheet {
-                DrawerContent(navController, auth) {
-                    scope.launch { drawerState.close() }
+    if (currentUser != null) {
+        // 3) Only show drawer when logged in
+        ModalNavigationDrawer(
+            drawerState   = drawerState,
+            drawerContent = {
+                ModalDrawerSheet {
+                    DrawerContent(navController, firebaseAuth) {
+                        scope.launch { drawerState.close() }
+                    }
+                }
+            }
+        ) {
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title          = { Text("Moodify") },
+                        navigationIcon = {
+                            IconButton(onClick = {
+                                scope.launch {
+                                    if (drawerState.isClosed) drawerState.open()
+                                    else drawerState.close()
+                                }
+                            }) {
+                                Icon(Icons.Default.Menu, contentDescription = "Menu")
+                            }
+                        }
+                    )
+                }
+            ) { padding ->
+                Box(Modifier.padding(padding)) {
+                    Host()
                 }
             }
         }
-    ) {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text("Moodify") },
-                    navigationIcon = {
-                        IconButton(onClick = {
-                            scope.launch {
-                                if (drawerState.isClosed) drawerState.open()
-                                else drawerState.close()
-                            }
-                        }) {
-                            Icon(Icons.Default.Menu, contentDescription = "Menu")
-                        }
-                    }
-                )
-            }
-        ) { padding ->
-            NavHost(
-                navController = navController,
-                startDestination = startDest,
-                modifier = Modifier.padding(padding)
-            ) {
-                authGraph(navController)
-                journalGraph(navController)
-                appGraph(navController)
-            }
+    } else {
+        // 4) No drawer for signed-out state
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Host()
         }
     }
 }
