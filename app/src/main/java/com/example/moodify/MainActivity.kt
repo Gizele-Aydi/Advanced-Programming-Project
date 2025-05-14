@@ -174,6 +174,19 @@ fun DrawerContent(
             onItemClick()
         }) { Text("Home") }
         Spacer(Modifier.height(8.dp))
+
+        // ← NEW: My Tasks
+        TextButton(onClick = {
+            // Navigate to tasks without a summary → loads saved ones
+            navController.navigate("tasks?summary=") {
+                popUpTo("journal") { inclusive = false }
+            }
+            onItemClick()
+        }) {
+            Text("My Tasks")
+        }
+        Spacer(Modifier.height(8.dp))
+
         TextButton(onClick = {
             auth.signOut()
             navController.navigate("signin") { popUpTo(0) }

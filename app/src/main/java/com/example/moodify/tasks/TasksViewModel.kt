@@ -3,6 +3,7 @@ package com.example.moodify.tasks
 // File: tasks/TasksViewModel.kt
 
 import android.util.Log
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -12,7 +13,11 @@ import com.example.moodify.journal.ChatCompletionMessage
 import com.example.moodify.journal.ChatCompletionRequest
 import com.example.moodify.journal.GroqService
 import com.example.moodify.BuildConfig
+import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -41,6 +46,8 @@ class TasksViewModel : ViewModel() {
         private set
 
     val maxSpins = 3
+    private val db     = FirebaseFirestore.getInstance()
+    private val uid    get() = FirebaseAuth.getInstance().currentUser?.uid
 
     private val groqAuthHeader = "Bearer ${BuildConfig.GROQ_API_KEY}"
     private val groqModelId    = "llama3-8b-8192"
@@ -104,7 +111,61 @@ class TasksViewModel : ViewModel() {
             spinCount = 0
         }
     }
+    fun saveSelectedTasks(onComplete: (Boolean) -> Unit = {}) {
+        val userId = uid ?: run {
+            onComplete(false); return
+        }
 
+        val toSave = selectedTasks.take(3).map { t ->
+            mapOf(
+                "task"        to t.task,
+                "priority"    to t.priority,
+                "description" to t.description
+            )
+        }
+
+        val doc = mapOf(
+            "tasks"   to toSave,
+            "savedAt" to Timestamp.now()
+        )
+
+        db.collection("users")
+            .document(userId)
+            .collection("dailyTasks")
+            .document("today")
+            .set(doc)
+            .addOnSuccessListener { onComplete(true) }
+            .addOnFailureListener { onComplete(false) }
+    }
+    fun loadSavedTasks() {
+        val userId = uid ?: return
+        viewModelScope.launch {
+            try {
+                val doc = db.collection("users")
+                    .document(userId)
+                    .collection("dailyTasks")
+                    .document("today")
+                    .get()
+                    .await()
+
+                // Firestore stores “tasks” as a List<Map<String,Any>>
+                val raw = doc.get("tasks") as? List<Map<String,Any>> ?: emptyList()
+                tasks = raw.mapNotNull { m ->
+                    val t = m["task"       ] as? String ?: return@mapNotNull null
+                    val p = (m["priority"] as? Number)?.toInt() ?: 0
+                    val d = m["description"] as? String ?: ""
+                    GeneratedTask(task = t, priority = p, description = d)
+                }
+
+                // disable any spinning UI
+                selectedTasks = tasks.take(3)
+                spinCount     = maxSpins
+
+            } catch (e: Exception) {
+                Log.e("TasksViewModel", "loadSavedTasks failed", e)
+            }
+        }
+    }
     fun spin() {
         if (spinCount >= maxSpins || tasks.isEmpty()) return
         val remaining = tasks.filter { it !in selectedTasks }
