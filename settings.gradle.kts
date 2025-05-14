@@ -10,8 +10,7 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
     }
-<<<<<<< Updated upstream
-=======
+
 
     resolutionStrategy {
         eachPlugin {
@@ -28,7 +27,6 @@ pluginManagement {
             }
         }
     }
->>>>>>> Stashed changes
 }
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
