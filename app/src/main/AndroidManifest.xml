@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Permissions -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
     <application
         android:allowBackup="true"
@@ -13,20 +18,45 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Moodify"
         tools:targetApi="31">
+
+        <!-- Main launcher activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.Moodify.NoActionBar">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+
+        <!-- Sleep Mode full-screen activity -->
+        <activity
+            android:name=".sleepLog.ui.SleepModeActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"/>
+
+        <!-- Alarm receiver for the “1 hour before bedtime” notification -->
+        <receiver
+            android:name=".sleepLog.notifications.SleepAlarmReceiver"
+            android:exported="false"/>
+
+        <!-- SCREEN_ON/OFF listener for actual sleep logging -->
+        <receiver
+            android:name=".sleepLog.notifications.SleepUsageReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.SCREEN_OFF"/>
+                <action android:name="android.intent.action.SCREEN_ON"/>
+            </intent-filter>
+        </receiver>
+
+        <!-- If you ever register SleepAlarmReceiver via AlarmManager, no further manifest entries needed there -->
         <meta-data
             android:name="preloaded_fonts"
-            android:resource="@array/preloaded_fonts" />
-    </application>
+            android:resource="@array/preloaded_fonts"/>
 
+    </application>
 </manifest>

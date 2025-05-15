@@ -28,8 +28,12 @@ import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.example.moodify.auth.SignInScreen
 import com.example.moodify.journal.EmotionScreen
+import com.example.moodify.sleepLog.ui.SleepChartScreen
+import com.example.moodify.sleepLog.ui.SleepLogScreen
+import com.example.moodify.sleepLog.ui.SleepScheduleScreen
 import com.example.moodify.tasks.TasksScreen
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -41,7 +45,9 @@ class MainActivity : ComponentActivity() {
     }
 }
 @Composable
-fun HomeScreen(onNavigateToJournal: () -> Unit) {
+fun HomeScreen(onNavigateToJournal: () -> Unit,
+               onNavigateToSleepSchedule: () -> Unit  // ← new
+) {
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -59,6 +65,9 @@ fun HomeScreen(onNavigateToJournal: () -> Unit) {
             Spacer(Modifier.height(16.dp))
             Button(onClick = onNavigateToJournal) {
                 Text("Go to Journal")
+            }
+            Button(onClick = onNavigateToSleepSchedule) {
+                Text("Sleep Schedule")
             }
         }
     }
@@ -84,7 +93,7 @@ fun MoodifyApp() {
 
     // 2) Build a single NavHost with all routes
     @Composable
-    fun Host() {
+    fun Host(navController: NavHostController, currentUser: FirebaseUser?) {
         NavHost(
             navController    = navController,
             startDestination = if (currentUser != null) "journal" else "signup"
@@ -92,8 +101,19 @@ fun MoodifyApp() {
             authGraph(navController)
             journalGraph(navController)
             appGraph(navController)
+
+            composable("sleepSchedule") {
+                SleepScheduleScreen(vm = viewModel())
+            }
+            composable("sleepLog") {
+                SleepLogScreen(vm = viewModel())
+            }
+            composable("sleepChart") {
+                SleepChartScreen() // no VM here
+            }
         }
     }
+
 
     if (currentUser != null) {
         // 3) Only show drawer when logged in
@@ -125,14 +145,14 @@ fun MoodifyApp() {
                 }
             ) { padding ->
                 Box(Modifier.padding(padding)) {
-                    Host()
+                    Host(navController, currentUser)
                 }
             }
         }
     } else {
         // 4) No drawer for signed-out state
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Host()
+            Host(navController, currentUser)
         }
     }
 }
@@ -183,8 +203,10 @@ fun NavGraphBuilder.journalGraph(navController: NavHostController) {
 
 fun NavGraphBuilder.appGraph(navController: NavHostController) {
     composable("home") {
-        HomeScreen(onNavigateToJournal = { navController.navigate("journal") })
-    }
+        HomeScreen(
+            onNavigateToJournal      = { navController.navigate("journal") },
+            onNavigateToSleepSchedule = { navController.navigate("sleepSchedule") }
+        )    }
 }
 
 @Composable
@@ -211,6 +233,10 @@ fun DrawerContent(
             Text("My Tasks")
         }
         Spacer(Modifier.height(8.dp))
+        TextButton(onClick = {
+            navController.navigate("sleepSchedule")
+            onItemClick()
+        }) { Text("Sleep Schedule") }
 
         TextButton(onClick = {
             auth.signOut()
