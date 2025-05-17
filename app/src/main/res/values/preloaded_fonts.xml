@@ -2,5 +2,9 @@
 <resources>
     <array name="preloaded_fonts" translatable="false">
         <item>@font/poppins</item>
+        <item>@font/poppins_bold</item>
+        <item>@font/poppins_bold_italic</item>
+        <item>@font/poppins_italic</item>
+        <item>@font/poppins_light_italic</item>
     </array>
 </resources>

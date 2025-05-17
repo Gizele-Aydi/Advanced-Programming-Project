@@ -6,20 +6,25 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -46,9 +51,11 @@ fun SignInScreen(
     // Define colors to match the design
     val darkBackground = Color(0xFF121212)
     val textFieldBorder = Color(0xFF2A2A2A)
-    val primaryBlue = Color(0xFF3B82F6)
     val textColor = Color.White
     val hintColor = Color(0xFF6B7280)
+
+    val passwordFocusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
 
     Box(
         modifier = Modifier
@@ -69,7 +76,6 @@ fun SignInScreen(
                 contentDescription = "Logo",
                 modifier = Modifier.size(50.dp)
             )
-
 
             Spacer(modifier = Modifier.height(40.dp))
 
@@ -97,9 +103,17 @@ fun SignInScreen(
                 placeholder = { Text("ex: jon.smith@email.com", color = hintColor, fontFamily = poppinsLight) },
                 label = { Text("Email", color = textColor, fontFamily = poppinsLight) },
                 singleLine = true,
+                textStyle = LocalTextStyle.current.copy(color = Color.White, fontFamily = poppinsLight),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Email,
+                    imeAction = ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(
+                    onNext = { passwordFocusRequester.requestFocus() }
+                ),
                 colors = TextFieldDefaults.outlinedTextFieldColors(
-                    cursorColor = primaryBlue,
-                    focusedBorderColor = primaryBlue,
+                    cursorColor = Color(0xFF5A9CB5),
+                    focusedBorderColor = Color(0xFF5A9CB5),
                     unfocusedBorderColor = textFieldBorder
                 ),
                 shape = RoundedCornerShape(12.dp),
@@ -117,27 +131,33 @@ fun SignInScreen(
                 placeholder = { Text("••••••••", color = hintColor, fontFamily = poppinsLight) },
                 label = { Text("Password", color = textColor, fontFamily = poppinsLight) },
                 singleLine = true,
+                textStyle = LocalTextStyle.current.copy(color = Color.White, fontFamily = poppinsLight),
                 visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = { focusManager.clearFocus() }
+                ),
                 colors = TextFieldDefaults.outlinedTextFieldColors(
-                    cursorColor = primaryBlue,
-                    focusedBorderColor = primaryBlue,
+                    cursorColor = Color(0xFF5A9CB5),
+                    focusedBorderColor = Color(0xFF5A9CB5),
                     unfocusedBorderColor = textFieldBorder
                 ),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
+                    .focusRequester(passwordFocusRequester)
+
             )
-
             Spacer(modifier = Modifier.height(40.dp))
-
             // Sign In button
             Button(
                 onClick = {
                     auth.signInWithEmailAndPassword(email.trim(), pass)
                         .addOnSuccessListener { result ->
-                            // Optional: update lastLogin timestamp
                             val uid = result.user?.uid ?: return@addOnSuccessListener
                             db.collection("users").document(uid)
                                 .update("lastLogin", System.currentTimeMillis())

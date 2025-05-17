@@ -3,8 +3,8 @@ package com.example.moodify.tasks
 // File: tasks/TasksViewModel.kt
 
 import android.util.Log
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
@@ -18,15 +18,9 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
 data class GeneratedTask(
@@ -42,7 +36,7 @@ class TasksViewModel : ViewModel() {
     var selectedTasks by mutableStateOf<List<GeneratedTask>>(emptyList())
         private set
 
-    var spinCount by mutableStateOf(0)
+    var spinCount by mutableIntStateOf(0)
         private set
 
     val maxSpins = 3
@@ -148,7 +142,6 @@ class TasksViewModel : ViewModel() {
                     .get()
                     .await()
 
-                // Firestore stores “tasks” as a List<Map<String,Any>>
                 val raw = doc.get("tasks") as? List<Map<String,Any>> ?: emptyList()
                 tasks = raw.mapNotNull { m ->
                     val t = m["task"       ] as? String ?: return@mapNotNull null

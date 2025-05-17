@@ -13,9 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.CheckCircle
@@ -45,11 +43,16 @@ fun SleepScheduleScreen(vm: SleepScheduleViewModel = viewModel()) {
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        "Sleep Schedules",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "Sleep Schedules",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             )
         },
@@ -274,14 +277,14 @@ fun SleepScheduleDialog(
     val types = listOf("DAILY", "WEEKLY", "WEEKDAYS", "WEEKENDS", "ONCE")
     val typeLabels = listOf("Daily", "Weekly", "Weekdays", "Weekends", "Once")
     var selectedTypeIndex by remember {
-        mutableStateOf(types.indexOf(initial?.type).takeIf { it >= 0 } ?: 0)
+        mutableIntStateOf(types.indexOf(initial?.type).takeIf { it >= 0 } ?: 0)
     }
     val selectedType = types[selectedTypeIndex]
 
     // 2) If WEEKLY, pick one weekday by name
     val daysOfWeek = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
     var selectedDayIndex by remember {
-        mutableStateOf(
+        mutableIntStateOf(
             initial?.dayOfWeek?.let { (it - 1).coerceIn(0, 6) } ?: 0
         )
     }

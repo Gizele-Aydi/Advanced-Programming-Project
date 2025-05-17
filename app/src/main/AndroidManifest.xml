@@ -56,7 +56,7 @@
         <!-- If you ever register SleepAlarmReceiver via AlarmManager, no further manifest entries needed there -->
         <meta-data
             android:name="preloaded_fonts"
-            android:resource="@array/preloaded_fonts"/>
+            android:resource="@array/preloaded_fonts" />
 
     </application>
 </manifest>

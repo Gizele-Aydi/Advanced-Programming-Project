@@ -80,6 +80,7 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.7.2")
     implementation("androidx.navigation:navigation-compose:2.7.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
+    implementation ("androidx.compose.material:material-icons-extended:<version>")
 
     implementation(platform("com.google.firebase:firebase-bom:32.1.0"))
     implementation(libs.firebase.auth.ktx)
@@ -93,7 +94,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.1")
     implementation(libs.androidx.navigation.fragment)
-
+    implementation ("androidx.activity:activity-compose:1.7.2")
+    implementation("io.coil-kt:coil-compose:2.4.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
